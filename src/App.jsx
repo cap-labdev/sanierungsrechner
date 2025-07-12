@@ -10,24 +10,16 @@ export default function App() {
   const [checkboxAusbau, setCheckboxAusbau] = useState(true);
   const [tooltipVisible, setTooltipVisible] = useState(false);
 
-  // Fenster-Eingaben
-  const [flaeche, setFlaeche] = useState("");
-  const [schlagduebel, setSchlagduebel] = useState("");
-  const [silikon, setSilikon] = useState("");
-
-  // Preise aus Sheet
+  const [hoehe, setHoehe] = useState("");
+  const [breite, setBreite] = useState("");
+  const [material, setMaterial] = useState("Holz");
   const [fensterDaten, setFensterDaten] = useState({});
+  const [ergebnisse, setErgebnisse] = useState(null);
 
-  // Ergebnis
-  const [ergebnis, setErgebnis] = useState(null);
-  const [toleranz, setToleranz] = useState({ plus: 15, minus: 10 }); // %
-
-  // Hilfsfunktion zum Sheets-API-URL bauen
   function buildSheetUrl(sheetName) {
     return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
   }
 
-  // Gewerke laden
   useEffect(() => {
     fetch(buildSheetUrl(GEWERKE_SHEET))
       .then((res) => res.text())
@@ -38,10 +30,9 @@ export default function App() {
         setGewerke(gewerkeListe);
         setSelectedGewerk(gewerkeListe[0] || "");
       })
-      .catch(() => alert("Fehler beim Laden der Gewerke aus Google Sheets."));
+      .catch(() => alert("Fehler beim Laden der Gewerke."));
   }, []);
 
-  // Fenster Daten laden
   useEffect(() => {
     if (selectedGewerk === "Fenster") {
       fetch(buildSheetUrl(FENSTER_SHEET))
@@ -50,93 +41,77 @@ export default function App() {
           const json = JSON.parse(text.substr(47).slice(0, -2));
           const rows = json.table.rows;
           const daten = {};
+
           rows.forEach((row) => {
-            const key = row.c[0]?.v || "";
-            const wert = parseFloat(row.c[2]?.v || 0);
-            daten[key.toLowerCase()] = wert;
+            const key = row.c[0]?.v?.toLowerCase();
+            if (!key) return;
+            daten[key] = {
+              holz: parseFloat(row.c[1]?.v || 0),
+              alu: parseFloat(row.c[2]?.v || 0),
+              kunststoff: parseFloat(row.c[3]?.v || 0),
+            };
           });
+
           setFensterDaten(daten);
         })
-        .catch(() => alert("Fehler beim Laden der Fenster-Daten."));
+        .catch(() => alert("Fehler beim Laden der Fensterdaten."));
     }
   }, [selectedGewerk]);
 
-  // Berechnung
   useEffect(() => {
     if (selectedGewerk !== "Fenster") {
-      setErgebnis(null);
+      setErgebnisse(null);
       return;
     }
 
-    // Eingaben in Zahlen wandeln
-    const fl = parseFloat(flaeche) || 0;
-    const sd = parseFloat(schlagduebel) || 0;
-    const si = parseFloat(silikon) || 0;
-    const ausbau = checkboxAusbau ? fensterDaten["ausbau und entsorgung alt"] || 0 : 0;
+    const h = parseFloat(hoehe) || 0;
+    const b = parseFloat(breite) || 0;
+    const m2 = (h * b) / 10000;
 
-    // Beispiel Berechnung: Basisfläche * Preis/m2 + Ausbau + Schlagdübel + Silikon
-    // (Du kannst die Formel noch anpassen, das ist ein Prototyp)
-    const basisPreis = fensterDaten["fläche"] || 0;
-    const preis = fl * basisPreis + ausbau + sd * (fensterDaten["schlagdübel"] || 0) + si * (fensterDaten["silikon"] || 0);
+    const matKeys = ["holz", "alu", "kunststoff"];
+    const results = {};
 
-    setErgebnis(preis);
-  }, [flaeche, schlagduebel, silikon, checkboxAusbau, fensterDaten, selectedGewerk]);
+    matKeys.forEach((mat) => {
+      const grundpreis = fensterDaten["preis_pro_m2"]?.[mat] || 0;
+      const handwerk = fensterDaten["handwerkskosten_m2"]?.[mat] || 0;
+      const schlagduebelAnz = m2 * (fensterDaten["schlagduebel_m2"]?.[mat] || 0);
+      const schlagduebelPreis = (fensterDaten["preis_schlagduebel"]?.[mat] || 0) * schlagduebelAnz;
+      const silikonLiter = m2 * (fensterDaten["silikon_m2"]?.[mat] || 0);
+      const silikonPreis = silikonLiter * (fensterDaten["preis_silikon"]?.[mat] || 0);
+      const ausbau = checkboxAusbau ? fensterDaten["ausbau und entsorgung alt"]?.[mat] || 0 : 0;
+
+      const gesamt = m2 * (grundpreis + handwerk) + schlagduebelPreis + silikonPreis + ausbau;
+      results[mat] = gesamt;
+    });
+
+    setErgebnisse(results);
+  }, [hoehe, breite, fensterDaten, checkboxAusbau, selectedGewerk]);
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", fontFamily: "Arial, sans-serif", padding: 20 }}>
-      <h1>Sanierungskosten-Rechner (Prototyp v1.0 von Maji und Ako)</h1>
+      <h1>Sanierungskosten-Rechner</h1>
 
       <label>
         Was willst du sanieren?{" "}
         <select value={selectedGewerk} onChange={(e) => setSelectedGewerk(e.target.value)}>
           {gewerke.map((g) => (
-            <option key={g} value={g}>
-              {g}
-            </option>
+            <option key={g} value={g}>{g}</option>
           ))}
         </select>
       </label>
 
       <div style={{ marginTop: 10 }}>
         <label style={{ display: "flex", alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={checkboxAusbau}
-            onChange={() => setCheckboxAusbau(!checkboxAusbau)}
-            style={{ marginRight: 8 }}
-          />
+          <input type="checkbox" checked={checkboxAusbau} onChange={() => setCheckboxAusbau(!checkboxAusbau)} style={{ marginRight: 8 }} />
           Kostenschätzung inkl. Ausbau und Entsorgung des alten Bestandes
           <div
             onMouseEnter={() => setTooltipVisible(true)}
             onMouseLeave={() => setTooltipVisible(false)}
-            style={{
-              marginLeft: 8,
-              display: "inline-block",
-              width: 18,
-              height: 18,
-              borderRadius: "50%",
-              backgroundColor: "#ccc",
-              color: "#333",
-              textAlign: "center",
-              cursor: "default",
-              fontWeight: "bold",
-            }}
-          >
-            ?
+            style={{ marginLeft: 8, width: 18, height: 18, borderRadius: "50%", backgroundColor: "#ccc", textAlign: "center", fontWeight: "bold", cursor: "default" }}
+          >?
             {tooltipVisible && (
-              <div
-                style={{
-                  position: "absolute",
-                  backgroundColor: "white",
-                  border: "1px solid #999",
-                  padding: 10,
-                  maxWidth: 300,
-                  marginTop: 5,
-                  zIndex: 10,
-                }}
-              >
+              <div style={{ position: "absolute", backgroundColor: "white", border: "1px solid #999", padding: 10, maxWidth: 300, marginTop: 5, zIndex: 10 }}>
                 Die Kostenschätzung geht davon aus, dass ein alter Fensterbestand ausgebaut und entsorgt wird.
-                Wird nur das Fensterloch neu genutzt (Neubau), fallen diese Kosten nicht an.
               </div>
             )}
           </div>
@@ -145,48 +120,20 @@ export default function App() {
 
       {selectedGewerk === "Fenster" && (
         <div style={{ marginTop: 20 }}>
-          <h2>Fenster Eingaben</h2>
-
-          <label>
-            Fläche (m2):{" "}
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={flaeche}
-              onChange={(e) => setFlaeche(e.target.value)}
-            />
-          </label>
-          <br />
-          <label>
-            Anzahl Schlagdübel:{" "}
-            <input
-              type="number"
-              min="0"
-              value={schlagduebel}
-              onChange={(e) => setSchlagduebel(e.target.value)}
-            />
-          </label>
-          <br />
-          <label>
-            Anzahl Silikon-Kartuschen:{" "}
-            <input
-              type="number"
-              min="0"
-              value={silikon}
-              onChange={(e) => setSilikon(e.target.value)}
-            />
-          </label>
+          <h2>Fenster Maße</h2>
+          <label>Höhe (cm): <input type="number" value={hoehe} onChange={(e) => setHoehe(e.target.value)} /></label><br />
+          <label>Breite (cm): <input type="number" value={breite} onChange={(e) => setBreite(e.target.value)} /></label><br />
         </div>
       )}
 
-      {ergebnis !== null && (
-        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#190436ff" }}>
-          <h3>Deine Kostenschätzung</h3>
-          <p>
-            Ca. <strong>{ergebnis.toFixed(2)} €</strong> (± {toleranz.plus}% / -{toleranz.minus}%)<br />
-            (inkl. Ausbau: {checkboxAusbau ? "Ja" : "Nein"})
-          </p>
+      {ergebnisse && (
+        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#f0f0f0" }}>
+          <h3>Deine Kostenschätzung (inkl. Toleranz ±15%)</h3>
+          <ul>
+            <li>Holz: ca. <strong>{ergebnisse.holz.toFixed(2)} €</strong></li>
+            <li>Alu: ca. <strong>{ergebnisse.alu.toFixed(2)} €</strong></li>
+            <li>Kunststoff: ca. <strong>{ergebnisse.kunststoff.toFixed(2)} €</strong></li>
+          </ul>
         </div>
       )}
     </div>
