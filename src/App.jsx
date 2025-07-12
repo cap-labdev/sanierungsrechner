@@ -89,7 +89,7 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 600, margin: "auto", fontFamily: "Arial, sans-serif", padding: 20 }}>
-      <h1>Sanierungskosten-Rechner</h1>
+      <h1>Sanierungskosten-Rechner v1.0 (von Maji und Ako)</h1>
 
       <label>
         Was willst du sanieren?{" "}
