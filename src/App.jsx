@@ -127,7 +127,7 @@ export default function App() {
       )}
 
       {ergebnisse && (
-        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#f0f0f0" }}>
+        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#17094aff" }}>
           <h3>Deine Kostenschätzung (inkl. Toleranz ±15%)</h3>
           <ul>
             <li>Holz: ca. <strong>{ergebnisse.holz.toFixed(2)} €</strong></li>
