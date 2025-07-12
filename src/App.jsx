@@ -181,7 +181,7 @@ export default function App() {
       )}
 
       {ergebnis !== null && (
-        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#f9f9f9" }}>
+        <div style={{ marginTop: 30, padding: 15, border: "1px solid #ddd", borderRadius: 5, backgroundColor: "#190436ff" }}>
           <h3>Deine Kostenschätzung</h3>
           <p>
             Ca. <strong>{ergebnis.toFixed(2)} €</strong> (± {toleranz.plus}% / -{toleranz.minus}%)<br />
